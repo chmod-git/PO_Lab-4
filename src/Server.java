@@ -5,6 +5,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 
 class InputData {
     int[][] matrix;
@@ -49,7 +50,15 @@ public class Server {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                Request req = gson.fromJson(line, Request.class);
+                Request req;
+                try {
+                    req = gson.fromJson(line, Request.class);
+                } catch (JsonSyntaxException e) {
+                    writer.write("INVALID_JSON\n");
+                    writer.flush();
+                    break;
+                }
+
                 System.out.println("Отримано команду: " + req.command);
 
                 switch (req.command) {
