@@ -64,7 +64,9 @@ public class Server {
                 switch (req.command) {
                     case "SEND_DATA":
                         receivedData = req.data;
-                        result.status = "pending";
+                        synchronized (result) {
+                            result.status = "pending";
+                        }
                         writer.write("DATA_RECEIVED\n");
                         writer.flush();
                         System.out.println("Дані отримано від клієнта.");
@@ -73,7 +75,9 @@ public class Server {
                     case "START_COMPUTE":
                         if (!isComputing.get() && receivedData != null) {
                             isComputing.set(true);
-                            result.status = "computing";
+                            synchronized (result) {
+                                result.status = "computing";
+                            }
                             writer.write("COMPUTE_STARTED\n");
                             writer.flush();
                             System.out.println("Розпочато обчислення.");
@@ -86,14 +90,26 @@ public class Server {
                         break;
 
                     case "GET_STATUS":
-                        writer.write(result.status + "\n");
+                        String currentStatus;
+                        synchronized (result) {
+                            currentStatus = result.status;
+                        }
+                        writer.write(currentStatus + "\n");
                         writer.flush();
-                        System.out.println("Надано статус: " + result.status);
+                        System.out.println("Надано статус: " + currentStatus);
                         break;
 
                     case "GET_RESULT":
-                        if ("done".equals(result.status)) {
-                            writer.write(gson.toJson(result) + "\n");
+                        boolean isDone;
+                        synchronized (result) {
+                            isDone = "done".equals(result.status);
+                        }
+                        if (isDone) {
+                            String serializedResult;
+                            synchronized (result) {
+                                serializedResult = gson.toJson(result);
+                            }
+                            writer.write(serializedResult + "\n");
                             System.out.println("Надано результат обчислення.");
                         } else {
                             writer.write("RESULT_NOT_READY\n");
@@ -114,6 +130,7 @@ public class Server {
             System.err.println("З'єднання з клієнтом розірвано або сталася помилка: " + e.getMessage());
         }
     }
+
 
     private static void computeMinMax(InputData inputData, OutputData result, Runnable onFinish) {
         new Thread(() -> {
@@ -151,10 +168,14 @@ public class Server {
                 }
                 result.min = globalMin;
                 result.max = globalMax;
-                result.status = "done";
+                synchronized (result) {
+                    result.status = "done";
+                }
                 System.out.println("Обчислення завершено. Мінімум: " + globalMin + ", Максимум: " + globalMax);
             } catch (Exception e) {
-                result.status = "error";
+                synchronized (result) {
+                    result.status = "error";
+                }
                 System.err.println("Помилка при обчисленні: " + e.getMessage());
             }
 
